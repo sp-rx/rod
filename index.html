@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Binocular Lens Compatibility</title>
+<style>
+  body { font-family: Arial, sans-serif; padding: 20px; background:#d1d1d1; }
+  h2,h3 { margin-bottom:10px; }
+  label { margin-right:15px; }
+  input, select, button {border-radius:6px; margin:5px 5px 15px 0; padding:5px; font-size:12px}
+  button { cursor:pointer; width:15%; border-radius:6px; border-radius:6px; }
+  input { width:15% }
+  select { width:15% }
+
+  /* Compact Card Grid */
+  #cardsContainer {
+    display: grid;
+    grid-template-columns: repeat(auto-fit,minmax(300px,1fr));
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .lens-card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 10px;
+    transition: transform 0.2s;
+    height: 100px;
+  }
+  .lens-card:hover { transform: translateY(-3px); }
+  .lens-info { flex:1; display:flex; flex-direction: column; justify-content:center; }
+  .lens-name { font-weight: bold; font-size: 12px; margin-bottom:4px; }
+  .score-bar {
+    width: 100%; height:20px; background:#eee; border-radius:5px; overflow:hidden; margin:2px 0;
+  }
+  .score-fill { height:100%; text-align:center; padding-right:3px; color:#fff; font-size:12px; line-height:20px; }
+  .price { margin-top:2px; font-weight:bold; font-size:12px; }
+.active-btn {
+  background:#165747;
+  color:white;
+}
+.header-img {
+  width: 100%;
+  margin-bottom: 15px;
+}
+
+.header-img img {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  border-radius: 8px;
+}
+  /* Score Colors */
+  .green { background:#165747; }
+  .yellow { background:#165747; }
+  .red { background:#165747; }
+
+</style>
+</head>
+<body>
+<div style="max-width:1000px">
+
+<div class="header-img" style="width:1000px">
+  <img src="https://raw.githubusercontent.com/sp-rx/OL-selector/main/Lens_Catalogue/rod2.png" alt="Header">
+</div>
+
+
+<h2>Progressive Lens Recommender</h2>
+
+<h3>Prescription</h3>
+
+<label><b>Right Eye</b></label>
+<label>SPH: <input type="number" id="odSPH" step="0.25" value="-1.00"></label>
+<label>CYL: <input type="number" id="odCYL" step="0.25" value="-1.00"></label>
+<label>Axis: <input type="number" id="odAxis" step="1" value="90"></label>
+<div></div>
+
+<label><b>Left Eye </b></label>
+<label>SPH: <input type="number" id="osSPH" step="0.25" value="-1.00"></label>
+<label>CYL: <input type="number" id="osCYL" step="0.25" value="-1.00"></label>
+<label>Axis: <input type="number" id="osAxis" step="1" value="90"></label>
+<div></div>
+
+<label><b>Near Vision</b></label>
+<label>ADD: <input type="number" id="addInput" step="0.25" value="1.00"></label>
+<label style="display:none"><button onclick="setEmphasis('none')">Balance Profile</button>
+<button onclick="setEmphasis('intermediate')">Softer Profile</button>
+<button onclick="setEmphasis('distance')">Sharper Profile</button></label>
+
+
+<h3>Lens Thickness Evaluation <button onclick="togglethickness()">Toggle</button></h3>
+
+
+<div id="reContainer" class="thickness" style="display:none; position:relative; border-radius:10px; width:1000px; height:357px; overflow:hidden;">
+  
+  <img id="reImg" style="width:100%; height:100%; object-fit:cover; object-position:50% 0%;">
+
+  <span id="reOverlay" style="
+    position:absolute;
+    top:10px;
+    left:40px;
+    color:black;
+    font-size:14px;
+  ">
+    Right Eye Thickness
+  </span>
+
+</div>
+
+
+<div class="thickness" style="display:none; height:20px"></div>
+
+<div id="leContainer" class="thickness" style="display:none; position:relative; border-radius:10px; width:1000px; height:357px; overflow:hidden;">
+  
+  <img id="leImg" style="width:100%; height:100%; object-fit:cover; object-position:50% 0%;">
+
+  <span id="leOverlay" style="
+    position:absolute;
+    top:10px;
+    left:40px;
+    color:black;
+    font-size:14px;
+  ">
+    Left Eye Thickness
+  </span>
+
+</div>
+
+<script>
+function togglethickness(){
+  const els = document.querySelectorAll('.thickness');
+  
+  els.forEach(el=>{
+    if(el.style.display === 'none'){
+      el.style.display = 'block';
+    } else {
+      el.style.display = 'none';
+    }
+  });
+}
+</script>
+
+<h3>Lens Type & Index</h3>
+
+
+<label>Type:
+  <select id="lensType">
+    <option value="clear">Clear</option>
+    <option value="photo">Photochromic (+800)</option>
+    <option value="blue">Blue Light (+200)</option>
+  </select>
+</label>
+
+<label>Index:
+  <select id="lensIndex">
+    <option value="1.5">1.50</option>
+    <option value="1.6">1.60</option>
+    <option value="1.67">1.67</option>
+    <option value="1.74">1.74</option>
+  </select>
+</label>
+
+<button style="background:#165747; color:white"onclick="calculate()">Recommend</button>
+
+
+<br><br>
+
+<script>
+// Preload all images into browser cache
+const allFiles = ['500','300','100','000','-200','-400','-600','-800','-1000','-1200'];
+
+const preloadedImages = {};
+
+function preloadImages(){
+  allFiles.forEach(file=>{
+    const img = new Image();
+    img.src = `https://raw.githubusercontent.com/sp-rx/OL-selector/refs/heads/main/thickness-photo/${file}.jpg`;
+    preloadedImages[file] = img;
+  });
+}
+
+
+// Hardcoded SE mapping table
+const seTable = {
+  '500': { top: [4.75,5.0,5.25,5.5], bottom: [5.75,6.0,6.25,6.5] },
+  '300': { top: [2.75,3.0,3.25,3.5], bottom: [3.75,4.0,4.25,4.5] },
+  '100': { top: [0.75,1.0,1.25,1.5], bottom: [1.75,2.0,2.25,2.5] },
+  '000':   { top: [-0.25,0.0,0.25,0.5], bottom: [-0.75,-1.0,-1.25,-1.5] },
+  '-200':{ top: [-1.75,-2.0,-2.25,-2.5], bottom: [-2.75,-3.0,-3.25,-3.5] },
+  '-400':{ top: [-3.75,-4.0,-4.25,-4.5], bottom: [-4.75,-5.0,-5.25,-5.5] },
+  '-600':{ top: [-5.75,-6.0,-6.25,-6.5], bottom: [-6.75,-7.0,-7.25,-7.5] },
+  '-800':{ top: [-7.75,-8.0,-8.25,-8.5], bottom: [-8.75,-9.0,-9.25,-9.5] },
+  '-1000':{ top: [-9.75,-10.0,-10.25,-10.5], bottom: [-10.75,-11.0,-11.25,-11.5] },
+  '-1200':{ top: [-11.75,-12.0,-12.25,-12.5], bottom: [-12.75,-13.0,-13.25,-13.5] }
+};
+
+// Calculate SE
+function calcSE(s, c){ return s + c/2; }
+
+// Find closest SE in table
+function getFileHalf(se){
+  let closestFile = null;
+  let closestHalf = 'top';
+  let minDiff = Infinity;
+
+  for(const file in seTable){
+    ['top','bottom'].forEach(half=>{
+      seTable[file][half].forEach(val=>{
+        let diff = Math.abs(se - val);
+        if(diff < minDiff){
+          minDiff = diff;
+          closestFile = file;
+          closestHalf = half;
+        }
+      });
+    });
+  }
+  return { file: closestFile, half: closestHalf };
+}
+
+// Update lens image
+function updateLens(eye){
+  let sph = parseFloat(document.getElementById(eye==='RE'?'odSPH':'osSPH')?.value) || 0;
+  let cyl = parseFloat(document.getElementById(eye==='RE'?'odCYL':'osCYL')?.value) || 0;
+  let se = calcSE(sph, cyl);
+
+  let { file, half } = getFileHalf(se);
+  if(!file) return;
+
+  let imgElement = document.getElementById(eye==='RE'?'reImg':'leImg');
+  imgElement.src = `https://raw.githubusercontent.com/sp-rx/OL-selector/refs/heads/main/thickness-photo/${file}.jpg`;
+  imgElement.style.objectPosition = `50% ${half==='top'?0:95}%`;
+}
+
+// Auto-update on SPH/CYL input change
+['odSPH','odCYL','osSPH','osCYL'].forEach(id=>{
+  document.getElementById(id)?.addEventListener('input',()=>{
+    updateLens('RE'); updateLens('LE');
+  });
+});
+
+// Initial load
+window.addEventListener('DOMContentLoaded',()=>{
+  preloadImages(); // <-- preload first
+  updateLens('RE'); 
+  updateLens('LE');
+});
+</script>
+
+
+
+
+
+<div id="cardsContainer"></div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script>
+// ------------------ Lens Data ------------------
+const lenses = [
+  {name: "Life Free 2<br>Entry Level, Good for Simple RX.", maxCYL: -1.50, axisComfort: 5, sphMin: 1.00, sphMax: -8.00, binSPH:2.00, binCYL:2.00, addMax:1.50, frameDecay:10, basePrice:1450, img:"life_free_2.jpg"},
+  {name: "PureLife Free 2<br>Entry Level, Improved Swim Effect.", maxCYL: -1.50, axisComfort: 10, sphMin: 1.50, sphMax: -8.00, binSPH:2.00, binCYL:2.00, addMax:1.75, frameDecay:8, basePrice:1850, img:"purelife_free_2.jpg"},
+  {name: "MyView 2<br>Best Entry Level, Improved Near Zone.", maxCYL: -2.00, axisComfort: 10, sphMin: 2.00, sphMax: -8.00, binSPH:2.00, binCYL:2.00, addMax:2.00, frameDecay:6, basePrice:2550, img:"myview_2.jpg"},
+  {name: "MyLife 2<br>Mid Range, Good for Complicated RX.", maxCYL: -2.50, axisComfort: 15, sphMin: 2.50, sphMax: -8.00, binSPH:2.50, binCYL:2.50, addMax:2.25, frameDecay:4, basePrice:2850, img:"mylife_2.jpg"},
+  {name: "Impression 2<br>Premium Range, Good for Complicated RX and improved Near Vision.", maxCYL: -2.50, axisComfort: 15, sphMin: 3.00, sphMax: -9.00, binSPH:3.00, binCYL:3.00, addMax:2.50, frameDecay:2, basePrice:3150, img:"impression_2.jpg"},
+  {name: "Multigressive Big Norm<br>Most Optimum Vision for all Rx.", maxCYL: -3.00, axisComfort: 15, sphMin: 3.50, sphMax: -10.00, binSPH:3.00, binCYL:3.00, addMax:2.75, frameDecay:1, basePrice:3450, img:"multigressive_big_norm.jpg"},
+  {name: "Impression Big Norm<br>Most Optimum Vision for all RX & Frame Design.", maxCYL: -3.00, axisComfort: 20, sphMin: 4.00, sphMax: -11.00, binSPH:3.00, binCYL:3.00, addMax:3.00, frameDecay:0, basePrice:4000, img:"impression_big_norm.jpg"}
+];
+
+let emphasis = 'none';
+function setEmphasis(type){ emphasis = type; calculate(); }
+
+function calcEyeScore(patientSPH, patientCYL, patientAxis, lens){
+  let sphScore = 100;
+  if(patientSPH > lens.sphMin) sphScore -= Math.floor((patientSPH - lens.sphMin)/0.25)*10;
+  if(patientSPH < lens.sphMax) sphScore -= Math.floor((lens.sphMax - patientSPH)/0.25)*10;
+  if(sphScore < 0) sphScore = 0;
+
+  let cylDiff = Math.abs(patientCYL) - Math.abs(lens.maxCYL);
+  let powerScore = 100;
+  if(cylDiff > 0) powerScore -= Math.floor(cylDiff/0.25)*10;
+  if(powerScore < 0) powerScore = 0;
+
+  const peaks = [90, 180];
+  let closestPeak = peaks.reduce((a,b)=>{
+    let d1=Math.min(Math.abs(patientAxis-a),180-Math.abs(patientAxis-a));
+    let d2=Math.min(Math.abs(patientAxis-b),180-Math.abs(patientAxis-b));
+    return d1<d2?a:b;
+  });
+
+  let delta = Math.min(Math.abs(patientAxis-closestPeak),180-Math.abs(patientAxis-closestPeak));
+  let axisScore=100;
+  if(delta>lens.axisComfort){
+    let rawDecay = Math.floor((delta-lens.axisComfort)/5)*10;
+    let cylFactor = Math.min(Math.abs(patientCYL)/Math.abs(lens.maxCYL),1);
+    axisScore -= rawDecay*cylFactor;
+  }
+  if(axisScore<0) axisScore=0;
+
+  return {sphScore, powerScore, axisScore};
+}
+
+function formatInput(id){
+  const input = document.getElementById(id);
+  input.addEventListener('blur', () => {
+    let val = parseFloat(input.value);
+    if(isNaN(val)) val = 0;
+    val = Math.round(val*4)/4;
+    input.value = val.toFixed(2);
+  });
+}
+['odSPH','odCYL','osSPH','osCYL'].forEach(formatInput);
+
+function calculate(){
+  const odSPH=parseFloat(document.getElementById("odSPH").value);
+  const odCYL=parseFloat(document.getElementById("odCYL").value);
+  const odAxis=parseFloat(document.getElementById("odAxis").value);
+  const osSPH=parseFloat(document.getElementById("osSPH").value);
+  const osCYL=parseFloat(document.getElementById("osCYL").value);
+  const osAxis=parseFloat(document.getElementById("osAxis").value);
+  const addValue=parseFloat(document.getElementById("addInput").value);
+  const type = document.getElementById("lensType").value;
+  const index = document.getElementById("lensIndex").value;
+
+  let scores = [];
+
+  lenses.forEach((lens,i)=>{
+    const odScores = calcEyeScore(odSPH, odCYL, odAxis, lens);
+    const osScores = calcEyeScore(osSPH, osCYL, osAxis, lens);
+
+    let binSPHdiff = Math.abs(odSPH - osSPH) - lens.binSPH;
+    let binCYLdiff = Math.abs(odCYL - osCYL) - lens.binCYL;
+    let binScore = 100;
+    if(binSPHdiff>0) binScore -= (binSPHdiff/0.25)*2.5;
+    if(binCYLdiff>0) binScore -= (binCYLdiff/0.25)*2.5;
+    if(binScore<0) binScore = 0;
+
+    let addScore = 100;
+    if(addValue>lens.addMax) addScore -= ((addValue - lens.addMax)/0.25)*10;
+    if(addScore<0) addScore = 0;
+
+    let odTotal = (odScores.sphScore + odScores.powerScore + odScores.axisScore)/3;
+    let osTotal = (osScores.sphScore + osScores.powerScore + osScores.axisScore)/3;
+    let totalScore = (odTotal + osTotal)/2;
+
+    let finalScore = (totalScore + binScore + addScore)/3;
+    finalScore *= (1 - lens.frameDecay/100);
+
+    if(emphasis==='intermediate'||emphasis==='distance'){
+      if(i!==3 && i!==5 && i!==6) finalScore *= 0.9;
+    }
+
+    scores.push({index:i, lens:lens, score:finalScore});
+  });
+
+  const benchmark = scores[6].score;
+  const scale = benchmark<100 ? (100/benchmark) : 1;
+  scores.forEach(s=> s.score = Math.min(s.score*scale,100));
+  scores.sort((a,b)=> b.score - a.score);
+
+  const container = document.getElementById("cardsContainer");
+  container.innerHTML = "";
+
+  scores.forEach(s=>{
+    let price = s.lens.basePrice;
+    let valid = true;
+    if(type==='blue' && index==='1.5') valid = false;
+    if(index==='1.74' && s.index <5) valid = false;
+    if(valid){
+      if(index==='1.6') price +=400;
+      if(index==='1.67') price +=400;
+      if(index==='1.74') price +=1500;
+      if(type==='photo') price +=800;
+      if(type==='blue') price +=200;
+    }
+
+    let color = s.score>=80 ? 'green' : s.score>=50 ? 'yellow' : 'red';
+
+    container.innerHTML += `
+      <div class="lens-card">
+        <div class="lens-info">
+          <div class="lens-name">${s.lens.name}</div>
+          <div class="score-bar"><div class="score-fill ${color}" style="width:${s.score.toFixed(1)}%">${s.score.toFixed(1)}%</div></div>
+          <div class="price">${valid? 'RM ' + price : 'N/A'}</div>
+        </div>
+      </div>
+    `;
+  });
+}
+
+// Blue light auto-jump & disable 1.5
+const lensTypeSelect = document.getElementById("lensType");
+const lensIndexSelect = document.getElementById("lensIndex");
+lensTypeSelect.addEventListener("change", function() {
+  const type = this.value;
+  const option15 = lensIndexSelect.querySelector('option[value="1.5"]');
+  if(type === "blue") {
+    option15.disabled = true;
+    if(lensIndexSelect.value==="1.5") lensIndexSelect.value="1.6";
+  } else {
+    option15.disabled = false;
+  }
+  calculate();
+});
+
+// Initial calculation
+calculate();
+</script>
+</body>
+</html>
